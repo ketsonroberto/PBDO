@@ -2,7 +2,7 @@ PBEopt: performance-based optimization with python.
 
 This is a python code used to perform the risk optimization of the columns of a reinforced concrete building using statistical linearization.
 The building is modeled as a nonlinear multi-degree-of-freedom oscillator.
-The wind excitation is modeled as a stochastic process.
+The wind excitation is modeled as a broadband stochastic process.
 
 The current version is a pre-release; therefore, users must consider the inherent risks of using a package under development.
 
