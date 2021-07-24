@@ -1,46 +1,31 @@
-![plot](./logo.png)
+PBEopt: performance-based optimization with python.
 
-[![Pypi](https://badge.fury.io/py/DICpy.svg)](https://badge.fury.io/py/DICpy.svg)
-[![Downloads](https://pypip.in/download/DICpy/badge.svg)](https://pypi.python.org/DICpy/)
+This is a python code used to perform the risk optimization of the columns of a reinforced concrete building using statistical linearization.
+The building is modeled as a nonlinear multi-degree-of-freedom oscillator.
+The wind excitation is modeled as a stochastic process.
 
-DICpy is a python toolbox for digital image correlation analysis.
-
-This python package contains a set of methods used in Digital Image Correlation for estimating displacement and strain fields in materials. It is developed and maintained by the Earthquake Engineering & Structural Dynamics lab at EPFL (Switzerland).
-
-The current version is a pre-release; therefore, users must consider the inherent risks of using a package under development. 
-
-# Documentation 
-
-For complete documentation please checkout:
+The current version is a pre-release; therefore, users must consider the inherent risks of using a package under development.
 
 # Contact 
 
-Developers can contribute with the development of this project using [github](https://github.com/eesd-epfl/DICpy).
-
-
-# Setup
-
-To install DICpy from PyPI
-```
-    pip install DICpy
-```
-
-To uninstall DICpy
-```
-    pip uninstall DICpy
-```
+Ketson R. M. dos Santos: ketson.santos@epfl.ch
 
 # Citations
 
-If you would like to cite DICpy, please use the following citation/bibtex
+Citation for the work presented in the code:
 
 > ....
 
 ```
-@misc{dicpy2021,
-  author       = {},
-  title        = {},
-  year         = 2021,
+@article{pbe_opt,
+    title = {Optimal performance-based design of non-linear stochastic dynamical RC structures subject to stationary wind excitation},
+    journal = {Engineering Structures},
+    volume = {78},
+    pages = {145-153},
+    year = {2014},
+    issn = {0141-0296},
+    doi = {https://doi.org/10.1016/j.engstruct.2014.07.047},
+    author = {André T. Beck and Ioannis A. Kougioumtzoglou and Ketson R.M. {dos Santos}}
 }
 ```
 
