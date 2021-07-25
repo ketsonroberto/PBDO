@@ -13,6 +13,7 @@ import time
 
 
 class PerformanceOpt(Stochastic):
+    # Performance based engineering: optimization. This is a subclass of Stochastic.
 
     def __init__(self, power_spectrum=None, model=None, freq=None, tol=1e-5, maxiter=100, design_life=1):
 
@@ -46,7 +47,10 @@ class PerformanceOpt(Stochastic):
         # nu = np.ones((ndof)) * [0.5]
         # alpha = np.ones((ndof)) * [1]
         # a = np.ones((ndof)) * [1.0]  # 0.01
+        
+        # Objective function: returns the rate of annual loss due to excessive drift.
 
+        # Parameters of the Bouc-Wen model.
         ksi = args[0]
         im_max = args[1]
         B_max = args[2]
@@ -55,6 +59,7 @@ class PerformanceOpt(Stochastic):
         alpha = args[5]
         a = args[6]
 
+        # Get some properties of the building.
         ndof = self.ndof
         self.columns = update_columns(columns=self.columns, lx=size_col, ly=size_col)
         Building = Structure(building, columns, slabs, core, concrete, steel, cost)
@@ -64,35 +69,44 @@ class PerformanceOpt(Stochastic):
 
         initial_cost = 0
         k = []
+        # Loop over each DOF.
         for i in range(ndof):
+            # Get properties of the columns.
             self.columns = update_columns(columns=self.columns, lx=size_col[i], ly=size_col[i])
             Ix = size_col[i] ** 4 / 12
             Iy = Ix  # Square section
             area = size_col[i] ** 2  # square section
 
+            #Get the stifness and cost.
             Building = Structure(building, columns, slabs, core, concrete, steel, cost)
             Cost = Costs(building, columns, slabs, core, concrete, steel, cost)
             stiffness = Building.stiffness_story()
             k.append(stiffness)
 
             initial_cost = initial_cost + Cost.initial_cost_stiffness(col_size=size_col[i], par0=25.55133, par1=0.33127)
+            
         # k[end] top floor
-        k = np.array(k)
-        mass = Building.mass_storey(top_story=False)
-        mass_top = Building.mass_storey(top_story=True)
-        m = np.ones((ndof)) * [mass]
+        k = np.array(k) # Stifness vector.
+        mass = Building.mass_storey(top_story=False) # mass per story.
+        mass_top = Building.mass_storey(top_story=True) # mass in the top story.
+        m = np.ones((ndof)) * [mass] # Mass vector.
         m[-1] = mass_top  # Top floor is m[end] - include water reservoir
+        
         # Estimate the damping.
-
         c = PerformanceOpt.linear_damping(self, m=m, k=k, ksi=ksi)
+        
+        # Determine the matrices M, C, and K.
         M, C, K = PerformanceOpt.create_mck(self, m=m, c=c, k=k, gamma=gamma, nu=nu, alpha=alpha, a=a)
 
+        # Estimate the rate of financial loss.
         financial_loss_rate = PerformanceOpt.annual_financial_loss(self, M=M, C=C, K=K, stiff=k, im_max=im_max,
                                                                    B_max=B_max, size_col=size_col, gamma=gamma, nu=nu,
                                                                    alpha=alpha, a=a)
 
+        # Estimate the total loss considering the design life of the building (e.g., 50 years converted into seconds).
         total_loss = financial_loss_rate * self.design_life
 
+        # total_cost = total loss.
         total_cost = initial_cost + total_loss
         print(size_col)
         print(total_cost)
@@ -103,12 +117,16 @@ class PerformanceOpt(Stochastic):
     def annual_financial_loss(self, M=None, C=None, K=None, stiff=None, im_max=None, B_max=None, size_col=None,
                               **kwargs):
 
-        im = im_max
-        B = B_max
+        # Estimate the annual financial loss.
+        im = im_max #Intensity measure.
+        B = B_max # Barrier B: interstory drift ratio.
 
+        # Determine the cost of failure.
         CostFailure = Costs(building=building, columns=columns, slabs=slabs, core=core, concrete=concrete,
                             steel=steel, cost=cost)
 
+       
+        # Properties of the excitation PSD.
         kv = wind["kv"]
         Av = wind["Av"]
         
@@ -126,15 +144,22 @@ class PerformanceOpt(Stochastic):
         imvec = np.linspace(0.00001, im_max, Nim)
         dIM = imvec[1] - imvec[0]
 
+        # Compute the duble integral pf the PBDO framework: check paper (Beck, dos Santos, and Kougioumtzoglou, 2014)
         integ = np.zeros(self.ndof)
         integral_IM = np.zeros((Nim, self.ndof))
+        
+        # Loop over the intensity measure (IM).
         for i in range(Nim):
+            # Intensity measure. 
             im = imvec[i]
+            
+            # Power spectrum.
             Ps = Stationary(power_spectrum_object='windpsd', ndof=self.ndof)
             power_spectrum, ub = Ps.power_spectrum_excitation(u10=im, freq=self.freq, z=z)
             # Sto = Stochastic(power_spectrum=power_spectrum, model=self.model, ndof=ndof, freq=self.freq)
 
             #start_time = time.time()
+            # Statistical linearization. Var = Variance of displacement, Vard = Variance of velocity.
             Var, Vard = PerformanceOpt.statistical_linearization(self, M=M, C=C, K=K, power_sp=power_spectrum,
                                                                  tol=self.tol, maxiter=self.maxiter, **kwargs)
             #end_time = time.time()
@@ -145,6 +170,7 @@ class PerformanceOpt(Stochastic):
             Var = Var[0]
             Vard = Vard[0]
 
+            # Estimate the wind force: aeroelasticity.
             rho = wind["rho"]
             Cd = wind["Cd"]
             L = columns["height"]
@@ -153,6 +179,7 @@ class PerformanceOpt(Stochastic):
             wind_force = rho * Cd * (building_area / 2) * (ub ** 2)
             meanY = Stochastic.linear_mean_response(stiff, wind_force, a)
    
+            # Loop over the Barrier B.
             integral_B = []
             for j in range(self.ndof):
                 B_min = max(0, meanY[j] - 1.96 * np.sqrt(Var[j]))
@@ -167,6 +194,7 @@ class PerformanceOpt(Stochastic):
                 for l in range(NB):
                     B = Bvec[l]
 
+                    # Estimate the up-crossing rate.
                     up_crossing_rate = ((np.sqrt(Vard[j] / Var[j])) / (2 * np.pi)) * \
                                        np.exp(-((B - meanY[j]) ** 2) / (2 * Var[j]))
 
@@ -236,6 +264,10 @@ class PerformanceOpt(Stochastic):
 
         return rate[0]
 
+    
+    #================================================== UNDER CONSTRUCTION ==============================================================
+    # The methods presented next are used in the stochastic gradient descent framework.
+    
     # def initial_cost(self, m=None, c=None, k=None, num_cols_floor=None, cost_cols):
     #
     #    ndof = self.ndof
@@ -253,6 +285,8 @@ class PerformanceOpt(Stochastic):
         # nu = np.ones((ndof)) * [0.5]
         # alpha = np.ones((ndof)) * [1]
         # a = np.ones((ndof)) * [1.0]  # 0.01
+        
+        # Method under development: objective function used in the stochastic gradient descent.
 
         ksi = args[0]
         im_max = args[1]
@@ -311,6 +345,9 @@ class PerformanceOpt(Stochastic):
     def annual_financial_loss_sto(self, M=None, C=None, K=None, stiff=None, im_max=None, B_max=None, size_col=None,
                               **kwargs):
 
+        
+        # Under development: usend in the estimation of the annual financial loss in the stochastic gradient descent framework. 
+        
         #im = im_max
         #B = B_max
         
