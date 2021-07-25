@@ -8,6 +8,7 @@ import sys
 
 class Structure:
 
+    # Class to perform the sturctural analysis of a building whose properties are provided.
     def __init__(self, building=None, columns=None, slabs=None, core=None, concrete=None, steel=None, cost=None):
         self.building = building
         self.columns = columns
@@ -18,6 +19,9 @@ class Structure:
         self.cost = cost
 
     def stiffness_story(self):
+        # Compute the stiffness for each story of the building.
+        # Read the information of the columns geometry and mechanical properties of the materials.
+        
         area_col = self.columns["area"]
         moment_inertia_col = self.columns["Iy"]
         height_col = self.columns["height"]
@@ -33,30 +37,35 @@ class Structure:
 
         k_story = num_col * k_col + num_core * k_core
 
+        # Return the stiffness of the story.
         return k_story
 
     def stiffness(self, area=None, moment_inertia=None, height=None):
-        Gc = self.concrete["Gc"]
-        Ec = self.concrete["Ec"]
-        Es = self.steel["Es"]
-        As = self.columns["v_steel"] * area
-        Ac = area - As
-        E = (As * Es + Ac * Ec) / (area)
+        # Compute the stiffness given the mechanical and geometrical properties.
+        
+        Gc = self.concrete["Gc"] # Shear modulus.
+        Ec = self.concrete["Ec"] # Concrete Young's module.
+        Es = self.steel["Es"] # Steel Young's module.
+        As = self.columns["v_steel"] * area # Area of steel.
+        Ac = area - As # Area of concrete.
+        E = (As * Es + Ac * Ec) / (area) # Effective Young's module.
 
         ks = Gc * area / height
         kf = 3 * E * moment_inertia / (height ** 3)
 
-        kt = 1 / ((1 / kf) + (1 / ks))
+        kt = 1 / ((1 / kf) + (1 / ks)) # Total stiffness.
 
         return kt
 
     def mass_storey(self, top_story=False):
-
-        num_col = self.columns["quantity"]
+        # Compute the equivalent mass corresponding to each story.
+            
+        num_col = self.columns["quantity"] 
         mslab = self.mass_slab()
         mcol = self.mass_column()
 
         if top_story:
+            # Do not consider the weight of the columns above the top floor.
             mass_st = 0.5 * (num_col * mcol) + mslab
         else:
             mass_st = num_col * mcol + mslab
@@ -64,7 +73,8 @@ class Structure:
         return mass_st
 
     def mass_slab(self):
-
+        # Compute the mass of each slab.
+        
         ros = self.steel["density"]
         ro = self.concrete["density"]
         thickness = self.slabs["thickness"]
@@ -79,6 +89,7 @@ class Structure:
         return mass_s
 
     def mass_column(self):
+        # Compute the mass of each column.
 
         ros = self.steel["density"]
         ro = self.concrete["density"]
@@ -93,6 +104,7 @@ class Structure:
         return mass_col
 
     def compression(self, col_size=None, L=None):
+        # Construct the Moment-Rotation diagram.
 
         # For a single column
         PA_ksi = 1.4503773800722e-7
@@ -218,13 +230,13 @@ class Structure:
         return M, phi
 
     def deformation_damage_index(self, B=None, stiffness=None, Mom=None, phi=None):
-
+        # Compute the Deformation Damage Index (DDI).
         k = stiffness
 
-        Lc = self.columns["height"]
-        EI = (k * Lc ** 3) / 12
-        M = 6 * EI * B / (Lc ** 2)
-        NM_kipin = 112.9848004306
+        Lc = self.columns["height"] # Height of each column.
+        EI = (k * Lc ** 3) / 12 # Young's module X Moment of inertia.
+        M = 6 * EI * B / (Lc ** 2) 
+        NM_kipin = 112.9848004306 # Convert N x m to kip x in
         M = M/NM_kipin
         My = Mom[1]
         phiy = phi[1]
@@ -232,6 +244,7 @@ class Structure:
         phiu = phi[2]
         phim = phiu
 
+        # interpolate rotation.
         if M <= Mom[1]:
             phim = M * phi[1] / Mom[1]
         elif Mom[1] < M <= Mom[2]:
@@ -241,6 +254,7 @@ class Structure:
         else:
             phim = phi[3]
 
+        # Compute DDI given the rotation (phi).
         if phim < phi[1]:
             ddi = 0
         elif phi[1] <= phim < phi[2]:
@@ -254,7 +268,8 @@ class Structure:
 
 
 class Costs(Structure):
-
+    # Estimate costs. Costs is a subclass of structure.
+    
     def __init__(self, building=None, columns=None, slabs=None, core=None, concrete=None, steel=None, cost=None):
         self.building = building
         self.columns = columns
@@ -268,10 +283,11 @@ class Costs(Structure):
                            steel=steel, cost=cost)
 
     def initial_cost_stiffness(self, col_size=None, par0=None, par1=None):
+        # initial cost is in fact the construction cost.
         
-        num_col = self.columns["quantity"]
-        height_col = self.columns["height"]
-        pslabs = self.slabs["cost_m2"]
+        num_col = self.columns["quantity"] # Number of columns.
+        height_col = self.columns["height"] # Height of columns.
+        pslabs = self.slabs["cost_m2"] # costs of slabs.
         
         area_col = col_size**2
         moment_inertia_col = (col_size**4)/12
@@ -285,7 +301,9 @@ class Costs(Structure):
         return cost_initial
 
     def cost_damage(self, b=None, col_size=None, L=None, ncolumns=None, dry_wall_area=None):
-
+        # Cost of failures for a given level of interstory drift ratio (b). 
+        
+        # Glazing
         A_glazing = 1.5 * L
         A_bulding = 2 * L * (self.building["width"] + self.building["depth"])
         Adry = 5.95
@@ -338,6 +356,8 @@ class Costs(Structure):
         ccol_df = cIDRu_df * (dry_wall_area / Adry)
         # bar(4) = datad % cost_par % bcol_df(i)
 
+        # Next: costs associated to the interstory drift ratio.
+        # COLUMN-SLAB CONNECTIONS.  
         if b < bsf:
             cf_cs = 0
         elif bcol > b >= bsf:
@@ -345,6 +365,7 @@ class Costs(Structure):
         else:
             cf_cs = ccol
 
+        # EXTERIOR GLAZING.
         if b < bsf_eg:
             cf_eg = 0
         elif bcol_eg > b >= bsf_eg:
@@ -352,6 +373,7 @@ class Costs(Structure):
         else:
             cf_eg = ccol_eg
 
+        # DYRWALL PARTITIONS.
         if b < bsf_dp:
             cf_dp = 0
         elif bcol_dp > b >= bsf_dp:
@@ -359,6 +381,7 @@ class Costs(Structure):
         else:
             cf_dp = ccol_dp
 
+        # DRYWALL FINISH
         if b < bsf_df:
             cf_df = 0
         elif bcol_df > b >= bsf_df:
@@ -366,6 +389,7 @@ class Costs(Structure):
         else:
             cf_df = ccol_df
 
+        # Next: costs associated to the deformation damage indexes.
         area_col = col_size**2
         moment_inertia_col = col_size**4/12
 
@@ -410,6 +434,7 @@ class Costs(Structure):
 
         f_duc = cf_duc * ncolumns
 
+        # Total cost.
         cf = cf_cs + cf_duc + (cf_eg + cf_dp + cf_df)*0 #Only considering the structural damage
 
         return cf
