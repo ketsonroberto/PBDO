@@ -10,14 +10,15 @@ from BuildingProperties import *
 from Hazards import Stationary
 
 class Stochastic:
-
-    def __init__(self, power_spectrum=None, model=None, ndof=None, freq=None):
+    # Class used to implement the statistical linearization used in the estimation of the moments of nonlinear oscillators.
+    
+    def __init__(self, power_spectrum=None, model='bouc_wen', ndof=None, freq=None):
 
         # todo: implement the case of full matrix power spectrum
-        self.model = model
-        self.ndof = ndof
-        self.freq = freq
-        self.power_spectrum = power_spectrum
+        self.model = model # So far, the only available model is 'bouc_wen'.
+        self.ndof = ndof # Number of degrees of freedom.
+        self.freq = freq # Vector of frequencies.
+        self.power_spectrum = power_spectrum # Power spectrum.
 
         # Initial guess of the iterative process in the statistical linearization
         if ndof >= 1:
@@ -33,10 +34,13 @@ class Stochastic:
             self.mck_matrices = 'mck_matrices_bw'
 
     def statistical_linearization(self, M=None, C=None, K=None, power_sp=None, tol=1e-3, maxiter=1000, **kwargs):
-
+        # Perform the statistical linearization.
+        
+        # Initial checks.
+        # Tolerance for float.
         if tol<sys.float_info.min:
             raise ValueError('tol cannot be lower than '+str(sys.float_info.min))
-
+    
         if not isinstance(maxiter,int):
             raise TypeError('maxiter MUST be an integer. ')
 
@@ -46,6 +50,8 @@ class Stochastic:
         freq = self.freq
         #power_spectrum = self.power_spectrum
         power_spectrum = power_sp
+        
+        # Vectors for the total matrices of the dynamical system.
         Mt = np.zeros(np.shape(M))
         Ct = np.zeros(np.shape(C))
         Kt = np.zeros(np.shape(K))
@@ -63,9 +69,13 @@ class Stochastic:
 
         # Do not use mass as a stop criterion
 
+        # Equivalent matrices.
         Meq, Ceq, Keq = Stochastic.assembly_matrices(self, ceq, keq)
         runs = 1
         error = 1000*tol
+        
+        # Optimization step for the statistical linearization. More information see the book by Roberts & Spanos 
+        # on random processes and statistical linearization.
         while error > tol and runs <= maxiter:
 
             Mt = M + Meq
@@ -73,9 +83,11 @@ class Stochastic:
             Kt = K + Keq
 
             H = []
+            # FRF function.
             for i in range(len(freq)):
                 H.append(inv(-(freq[i]**2) * Mt + 1j * freq[i] * Ct + Kt))
 
+            # Equivalent quantities.    
             ceq_1 = copy.copy(ceq)
             keq_1 = copy.copy(keq)
             ceq, keq, Var, Vard = Stochastic.update_matrices(self, H, power_spectrum, ceq, keq, kwargs)
@@ -84,20 +96,22 @@ class Stochastic:
             dceq = abs(ceq - ceq_1) / abs(ceq_1)
             dkeq = abs(keq - keq_1) / abs(keq_1)
 
+            # Error
             error = np.min(np.minimum(dceq, dkeq))
             runs = runs + 1
 
             return Var, Vard
 
     def assembly_matrices(self, ceq=None, keq=None):
-
+        # Method to assemble the equivalent matrices.
+        
         assembly_matrices_fun = eval("Stochastic." + self.create_matrices)
         Meq, Ceq, Keq = assembly_matrices_fun(self, ceq, keq)
 
         return Meq, Ceq, Keq
 
     def create_matrix_bw(self, ceq=None, keq=None):
-
+        # Create the equivalent  M, C, and K, matrices for the Bouc-Wen model.
         ndof = self.ndof
         Meq = np.zeros((2 * ndof, 2 * ndof))
         Ceq = np.zeros((2 * ndof, 2 * ndof))
@@ -112,14 +126,15 @@ class Stochastic:
         return Meq, Ceq, Keq
 
     def update_matrices(self, H=None, power_spectrum=None, ceq=None, keq=None, kwargs=None):
-
+        # Update the equivalent M, C, and K matrices.
         update_matrices_fun = eval("Stochastic." + self.equivalent_elements)
         ceq, keq, Var, Vard = update_matrices_fun(self, H, power_spectrum, ceq, keq, kwargs)
 
         return ceq, keq, Var, Vard
 
     def equivalent_elements_bw(self, H=None, power_spectrum=None, ceq_in=None, keq_in=None, kwargs=None):
-
+        # Find the equivalent elements for the Bouc-Wen model.
+        
         if 'gamma' in kwargs.keys():
             gamma = kwargs['gamma']
         else:
@@ -166,14 +181,15 @@ class Stochastic:
         return ceq, keq, Var, Vard
 
     def create_mck(self, m=None, c=None, k=None, **kwargs):
-
+        # Create the M, C, K, linear matrices.
+        
         mck_matrices_fun = eval("Stochastic." + self.mck_matrices)
         M, C, K = mck_matrices_fun(self, m=m, c=c, k=k, kwargs=kwargs)
 
         return M, C, K
 
     def mck_matrices_bw(self, m=None, c=None, k=None, kwargs=None):
-
+        # Construct the M,C,K matrices for the Bouc-Wen model.
         ndof = self.ndof
 
         if 'gamma' in kwargs.keys():
@@ -220,7 +236,8 @@ class Stochastic:
         return M, C, K
 
     def linear_damping(self, m=None, k=None, ksi=None):
-
+        # Estimate the Rayleigh damping.
+        
         ndof = self.ndof
 
         Minv = np.zeros((ndof, ndof))
@@ -262,7 +279,7 @@ class Stochastic:
 
     @staticmethod
     def linear_mean_response(k=None, F=None, a=None):
-
+        # Find the linear mean response solving the linear system F=Kx.
         ndof = len(k)
         KF = np.zeros((ndof, ndof))
         K = np.zeros((ndof, ndof))
@@ -279,6 +296,8 @@ class Stochastic:
         mean_response = KF.dot(F)
 
         return mean_response
+    
+    # ============================== UNDER CONSTRUCTION ==============================
 
     def get_MCK(self, size_col=None, args=None, columns=None):
         # im_max: maximum intensity measure
@@ -291,7 +310,7 @@ class Stochastic:
         # nu = np.ones((ndof)) * [0.5]
         # alpha = np.ones((ndof)) * [1]
         # a = np.ones((ndof)) * [1.0]  # 0.01
-
+        
         ksi = args[0]
         im_max = args[1]
         B_max = args[2]
