@@ -1,3 +1,5 @@
+# THIS IS A FILE TO TEST THE CODE. DO NOT USE IT AS PART OF THE CODE.
+
 import matplotlib.pyplot as plt
 import numpy as np
 from StochasticMechanics import Stochastic
