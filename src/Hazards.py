@@ -4,6 +4,7 @@ from os import path
 
 
 class Stationary:
+    # Modeling hazards as stochastic processes: winds are modeled as broadband stationary stochastic processes.
 
     def __init__(self, power_spectrum_object=None, power_spectrum_script=None, pdf_object=None, pdf_script=None,
                  ndof=None):
@@ -14,9 +15,13 @@ class Stationary:
         self.pdf_script = pdf_script
         self.ndof = ndof
 
+        # Initial checks.
+        
+        # Number of degrees-of-freedom: ndof.
         if ndof is None:
             raise ValueError('NDOF cannot be None.')
 
+        # Cehck if the power spectrum (PS) is provided as a script.
         if power_spectrum_script is not None:
             self.user_ps_check = path.exists(power_spectrum_script)
         else:
@@ -28,6 +33,7 @@ class Stationary:
             except ImportError:
                 raise ImportError('There is no module implementing a power spectrum.')
 
+        # Check if the probability density function of the hazard is provided as a script.
         if pdf_script is not None:
             self.user_pdf_check = path.exists(pdf_script)
         else:
@@ -42,7 +48,9 @@ class Stationary:
         if self.power_spectrum_object is 'white_noise':
             self.pdf_object = 'gaussian'
 
+            
     def power_spectrum_excitation(self, freq=None, **kwargs):
+        # implementing the power spectrum of the excitation (Hazard).
 
         if self.user_ps_check:
             if self.power_spectrum_script is None:
@@ -61,6 +69,7 @@ class Stationary:
         return power_spectrum, U
 
     def white_noise(self, freq=None, **kwargs):
+        # If the PS of the excitation is modeled as a white noise.
 
         if 'S0' in kwargs.keys():
             S0 = kwargs['S0']
@@ -78,12 +87,14 @@ class Stationary:
         return power_spectrum, U
 
     def windpsd(self, u10=None, freq=None, **kwargs):
-
+        # For Wind PSD.
+        
         if 'z' in kwargs.keys():
             z = kwargs['z']
         else:
             raise ValueError('z cannot be None.')
 
+        # Parameters of the wind PSD.
         ak = 6.868
         bk = 1
         ck = 10.302
@@ -102,9 +113,11 @@ class Stationary:
   
         ndof = self.ndof
         power_spectrum = np.zeros((len(freq),ndof))
-        freq = freq/(2*np.pi)
+        freq = freq/(2*np.pi) # Frequency in Hz.
 
         U = []
+        
+        # Loop over each floor to define a height-dependent hazard (Wind).
         for i in range(ndof):
             ub = (uast / kk) * np.log(z[i] / z0)
             U.append(ub)
@@ -136,7 +149,8 @@ class Stationary:
 
     @staticmethod
     def gaussian(im=None, **kwargs):
-
+        # Static method for the Normal distribution modeling the probabilistic characteristics of the hazard.
+        
         if 'mean' in kwargs.keys():
             mean = kwargs['mean']
         else:
@@ -153,6 +167,7 @@ class Stationary:
 
     @staticmethod
     def weibull(im=None, **kwargs):
+        # static method for the Weibull distribution used to model the probabilist characteristics of the hazard.
 
         if 'kv' in kwargs.keys():
             kv = kwargs['kv']
@@ -170,6 +185,7 @@ class Stationary:
 
     @staticmethod
     def gumbel(im=None, **kwargs):
+        # static method for the Gumbel distribution used to model the probabilist characteristics of the hazard.
 
         if 'kv' in kwargs.keys():
             kv = kwargs['kv']
